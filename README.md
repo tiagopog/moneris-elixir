@@ -1,23 +1,74 @@
 # MonerisElixir
 
-Unofficial Elixir client for processing payments through [Moneris eSELECT+](https://www.moneris.com/).
-
-[![Hex.pm](https://img.shields.io/hexpm/v/moneris.svg?maxAge=2592000)](https://hex.pm/packages/moneris)
+Unofficial Elixir client for processing payments through [Moneris](https://www.moneris.com/).
 
 ## Installation
-
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `moneris` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:moneris, "~> 0.1.0"}
+    {:moreris, git: "https://github.com/tiagopog/moneris-elixir.git"}
   ]
 end
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/moneris](https://hexdocs.pm/moneris).
+## Usage
 
+### Example of Pre-Authorization + Completion with CVD
+
+```elixir
+# Set up the gateway infomation:
+iex> gateway = Moneris.Gateway.new(:development, "{{username}}", "{{api_key}}")
+%Moneris.Gateway{
+  url: "https://esqa.moneris.com/gateway2/servlet/MpgRequest",
+  store_id: "{{username}}",
+  api_token: "{{api_key}}"
+}
+
+# Pre-authorize the payment:
+iex> Moneris.preauth(gateway, order, card)
+{:ok,
+ %Moneris.Response{
+   order_id: "e7e4a53245084998b5f7fa8155ffde10",
+   amount: 1001,
+   transaction_number: "10-0_482",
+   reference_number: "660188080010010130",
+   message: "Approved",
+   code: 0,
+   cvd: "1M",
+   avs: "",
+   cvd_verified: false,
+   address_verified: false,
+   zipcode_verified: false,
+   success: true
+ }}
+
+# Update the order with some data from pre-authorization step:
+iex> order = %Moneris.Order{order | transaction_number: "10-0_482", reference_number: "660188080010010130"}
+%Moneris.Order{
+  order_id: "e7e4a53245084998b5f7fa8155ffde10",
+  amount: 1001,
+  crypt_type: 7,
+  cust_id: "ecom-order-num-5",
+  transaction_number: "10-0_482",
+  reference_number: "660188080010010130"
+}
+
+# Capture the payment:
+iex> Moneris.capture(gateway, order)
+{:ok,
+ %Moneris.Response{
+   order_id: "e7e4a53245084998b5f7fa8155ffde10",
+   amount: 1001,
+   transaction_number: "11-1_482",
+   reference_number: "660188080010010140",
+   message: "Approved",
+   code: 0,
+   cvd: "",
+   avs: "",
+   cvd_verified: false,
+   address_verified: false,
+   zipcode_verified: false,
+   success: true
+ }}
+```
