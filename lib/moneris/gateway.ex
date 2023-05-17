@@ -1,9 +1,9 @@
 defmodule Moneris.Gateway do
-  import XmlBuilder
-
   @moduledoc """
   Gateway for development or production.
   """
+
+  import XmlBuilder
 
   defstruct [:url, :store_id, :api_token]
   @type t :: %Moneris.Gateway{url: String.t, store_id: String.t, api_token: String.t}

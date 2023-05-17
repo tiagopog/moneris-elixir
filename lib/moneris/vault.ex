@@ -1,11 +1,11 @@
 defmodule Moneris.Vault do
-  alias Moneris.{Gateway, Transaction}
-
   @moduledoc """
-  Vault.
+  Module for tokenizing credit cards with Moneris Vault.
   """
 
-  def add(gateway, card, verification_id) do
+  alias Moneris.{Card, Gateway, Order, Transaction}
+
+  def add(%Gateway{} = gateway, %Card{} = card, verification_id) do
     case tokenize(card, gateway) do
       {:ok, token} -> verify(token, card, gateway, verification_id)
       {:error, message} -> {:error, message}
@@ -13,7 +13,7 @@ defmodule Moneris.Vault do
     end
   end
 
-  def remove(gateway, token) do
+  def remove(%Gateway{} = gateway, token) do
     xml = Transaction.build_token(token)
 
     gateway
@@ -21,7 +21,7 @@ defmodule Moneris.Vault do
     |> Transaction.build_response
   end
 
-  def update(gateway, token, card) do
+  def update(%Gateway{} = gateway, token, card) do
     xml = Transaction.build_token(token) ++ Transaction.build_card(card)
 
     gateway
@@ -29,7 +29,7 @@ defmodule Moneris.Vault do
     |> Transaction.build_response
   end
 
-  def purchase(gateway, token, order) do
+  def purchase(%Gateway{} = gateway, token, %Order{} = order) do
     xml = Transaction.build_token(token) ++ Transaction.build_order(order)
 
     gateway
@@ -37,7 +37,7 @@ defmodule Moneris.Vault do
     |> Transaction.build_response
   end
 
-  def partial_refund(gateway, token, order, refund_amount) do
+  def partial_refund(%Gateway{} = gateway, token, %Order{} = order, refund_amount) do
     xml = Transaction.build_token(token) ++ Transaction.build_partial_refund_for_vault(order, refund_amount)
 
     gateway
@@ -45,7 +45,7 @@ defmodule Moneris.Vault do
     |> Transaction.build_response
   end
 
-  defp tokenize(card, gateway) do
+  defp tokenize(%Card{} = card, %Gateway{} = gateway) do
     xml = Transaction.build_card(card) ++ Transaction.build_avs(card) ++ Transaction.default_crypt_type()
 
     gateway
@@ -53,7 +53,7 @@ defmodule Moneris.Vault do
     |> Transaction.build_token_response
   end
 
-  defp verify(token, card, gateway, verification_id) do
+  defp verify(token, %Card{} = card, %Gateway{} = gateway, verification_id) do
     xml = Transaction.build_token(token) ++
           Transaction.build_verification(card.expdate, verification_id) ++
           Transaction.build_cvd(card) ++

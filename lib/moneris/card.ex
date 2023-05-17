@@ -1,6 +1,6 @@
 defmodule Moneris.Card do
   @moduledoc """
-  Credit card information.
+  Holds credit card information.
   """
 
   defstruct [

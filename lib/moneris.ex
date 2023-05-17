@@ -1,13 +1,14 @@
 defmodule Moneris do
-  alias Moneris.{Gateway, Transaction}
   @moduledoc """
   Documentation for Moneris.
   """
 
+  alias Moneris.{Card, Gateway, Order, TokenizedCard, Transaction}
+
   @doc """
-  Purchase
+  Purchase operation.
   """
-  def purchase(gateway, order, card) do
+  def purchase(%Gateway{} = gateway, %Order{} = order, %Card{} = card) do
     xml = Transaction.build_card(card) ++ Transaction.build_order(order)
 
     gateway
@@ -18,7 +19,7 @@ defmodule Moneris do
   @doc """
   Purchase 3D-Secure with a raw cryptogram for Apple Pay, etc.
   """
-  def purchase_3ds(gateway, order, network_tokenization_card) do
+  def purchase_3ds(%Gateway{} = gateway, %Order{} = order, %TokenizedCard{} = network_tokenization_card) do
     xml = Transaction.build_card(network_tokenization_card.card) ++
       Transaction.build_network_tokenization(network_tokenization_card) ++
       Transaction.build_order(order)
@@ -28,7 +29,10 @@ defmodule Moneris do
     |> Transaction.build_response
   end
 
-  def preauth(gateway, order, card) do
+  @doc """
+  Pre-authorizing payment operation.
+  """
+  def preauth(%Gateway{} = gateway, %Order{} = order, %Card{} = card) do
     xml = Transaction.build_card(card) ++ Transaction.build_order(order)
 
     gateway
@@ -36,7 +40,10 @@ defmodule Moneris do
     |> Transaction.build_response
   end
 
-  def capture(gateway, order) do
+  @doc """
+  Capture payment operation.
+  """
+  def capture(%Gateway{} = gateway, %Order{} = order) do
     xml = Transaction.build_capture(order)
 
     gateway
@@ -44,7 +51,7 @@ defmodule Moneris do
     |> Transaction.build_response
   end
 
-  def release(gateway, order) do
+  def release(%Gateway{} = gateway, %Order{} = order) do
     # releasing an order is a capture for 0 dollars
     xml = Transaction.build_capture(%{order | amount: 0})
 
@@ -53,7 +60,7 @@ defmodule Moneris do
     |> Transaction.build_response
   end
 
-  def void(gateway, order) do
+  def void(%Gateway{} = gateway, %Order{} = order) do
     # you need to do a capture before you can do a void.
     xml = Transaction.build_refund(order)
 
@@ -62,7 +69,7 @@ defmodule Moneris do
     |> Transaction.build_response
   end
 
-  def refund(gateway, order) do
+  def refund(%Gateway{} = gateway, %Order{} = order) do
     xml = Transaction.build_refund(order)
 
     gateway
@@ -70,7 +77,7 @@ defmodule Moneris do
     |> Transaction.build_response
   end
 
-  def partial_refund(gateway, order, refund_amount) do
+  def partial_refund(%Gateway{} = gateway, %Order{} = order, refund_amount) do
     xml = Transaction.build_partial_refund(order, refund_amount)
 
     gateway
@@ -78,7 +85,7 @@ defmodule Moneris do
     |> Transaction.build_response
   end
 
-  def verify(gateway, card) do
+  def verify(%Gateway{} = gateway, %Card{} = card) do
     uuid = UUID.uuid4(:hex)
     xml = Transaction.build_card(card) ++
           Transaction.build_verification(card.expdate, uuid) ++

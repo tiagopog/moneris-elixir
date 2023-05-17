@@ -1,12 +1,13 @@
 defmodule Moneris.Transaction do
-  import SweetXml
-  alias Moneris.Response
-
   @moduledoc """
-  Transaction.
+  Module for structuring transactions in Moneris.
   """
 
-  def build_card(%{name: name, email: email, phone: phone, pan: pan, expdate: expdate} = card) do
+  import SweetXml
+
+  alias Moneris.{Card, Order, Response, TokenizedCard}
+
+  def build_card(%Card{name: name, email: email, phone: phone, pan: pan, expdate: expdate} = card) do
     [
       XmlBuilder.element(:cust_id,  email),
       XmlBuilder.element(:phone,    phone),
@@ -17,19 +18,17 @@ defmodule Moneris.Transaction do
     ] ++ build_cvd(card)
   end
 
-  def build_card(%{pan: pan, expdate: expdate} = card) do
+  def build_card(%Card{pan: pan, expdate: expdate} = card) do
     [
       XmlBuilder.element(:pan,     pan),
       XmlBuilder.element(:expdate, expdate)
     ] ++ build_cvd(card)
   end
 
-  def build_card(_) do
-    []
-  end
+  def build_card(_), do: []
 
   # network tokenization for Apply Pay and Android Pay
-  def build_network_tokenization(%{cryptogram: cryptogram, source: source}) do
+  def build_network_tokenization(%TokenizedCard{cryptogram: cryptogram, source: source}) do
     wallet_indicator = case source do
       "apple_pay" -> "APP"
       "android_pay" -> "ANP"
@@ -49,16 +48,15 @@ defmodule Moneris.Transaction do
     ]
   end
 
-  def build_avs(%{zip: zip}) do
+  def build_avs(%Card{zip: zip}) do
     avs_info = [XmlBuilder.element(:avs_zipcode, zip)]
 
     [XmlBuilder.element(:avs_info, avs_info)]
   end
-  def build_avs(_) do
-    []
-  end
 
-  def build_cvd(%{cvv: cvv}) do
+  def build_avs(_), do: []
+
+  def build_cvd(%Card{cvv: cvv}) do
     cvd_info = [
       XmlBuilder.element(:cvd_indicator, 1),
       XmlBuilder.element(:cvd_value, cvv)
@@ -67,15 +65,13 @@ defmodule Moneris.Transaction do
     [XmlBuilder.element(:cvd_info, cvd_info)]
   end
 
-  def build_cvd(_) do
-    []
-  end
+  def build_cvd(_), do: []
 
   def default_crypt_type do
     [XmlBuilder.element(:crypt_type,  7)] # 7 = SSL enabled merchant
   end
 
-  def build_refund(order) do
+  def build_refund(%Order{} = order) do
     [
       XmlBuilder.element(:txn_number,  order.transaction_number),
       XmlBuilder.element(:order_id,    order.order_id),
@@ -83,7 +79,7 @@ defmodule Moneris.Transaction do
     ]
   end
 
-  def build_partial_refund(order, refund_amount) do
+  def build_partial_refund(%Order{} = order, refund_amount) do
     refund_in_decimal = (refund_amount / 1) / 100.0
 
     [
@@ -94,7 +90,7 @@ defmodule Moneris.Transaction do
     ]
   end
 
-  def build_partial_refund_for_vault(order, refund_amount) do
+  def build_partial_refund_for_vault(%Order{} = order, refund_amount) do
     refund_in_decimal = (refund_amount / 1) / 100.0
 
     # no txn_number (empty or otherwise) when using vault
@@ -109,7 +105,7 @@ defmodule Moneris.Transaction do
     [XmlBuilder.element(:data_key, token)]
   end
 
-  def build_capture(order) do
+  def build_capture(%Order{} = order) do
     amount_in_decimal = (order.amount / 1) / 100.0
 
     [
@@ -120,7 +116,7 @@ defmodule Moneris.Transaction do
     ]
   end
 
-  def build_order(order) do
+  def build_order(%Order{} = order) do
     amount_in_decimal = (order.amount / 1) / 100.0
 
     [
@@ -132,20 +128,23 @@ defmodule Moneris.Transaction do
   end
 
   def build_response({:ok, %{body: body}}) do
-    xml = body |> parse
+    xml = parse(body)
     # is_complete = xpath(xml, ~x"//response/receipt/Complete/text()"s)
     response_code = xpath(xml, ~x"//response/receipt/ResponseCode/text()"Io) || 999
     success = response_code < 50
+
     if success do
       {:ok, parse_order_response(xml)}
     else
       {:error, parse_error_reponse(xml)}
     end
   end
+
   def build_response({:error, %{body: body}}) do
-    xml = body |> parse
+    xml = parse(body)
     {:error, parse_error_reponse(xml)}
   end
+
   def build_response(_) do
     {:error, %Response{success: false, message: "unable to complete transaction."}}
   end
@@ -163,11 +162,13 @@ defmodule Moneris.Transaction do
     success = response_code < 50
 
     decimal_amount = xpath(xml, ~x"//response/receipt/TransAmount/text()"s)
+
     # this converts the text "null" to 0, unlike using the "f" option with xpath:
-    decimal_amount = case Float.parse(decimal_amount) do
-    {decimal_amount, _} -> decimal_amount
-    :error -> 0.0
-    end
+    decimal_amount =
+      case Float.parse(decimal_amount) do
+        {decimal_amount, _} -> decimal_amount
+        :error -> 0.0
+      end
 
     amount = round(decimal_amount * 100)
 
@@ -182,7 +183,7 @@ defmodule Moneris.Transaction do
       address_verified: address_verified?(avs),
       zipcode_verified: zipcode_verified?(avs),
       success: success,
-      amount: amount,
+      amount: amount
     }
   end
 
@@ -207,28 +208,24 @@ defmodule Moneris.Transaction do
     }
   end
 
-  defp cvd_error_message(cvd) do
-    if cvd == "null" do
-      nil
-    else
-      # this is typically a two character string "1M" where the second char is the code we need to check.
-      cvd = String.at(cvd, 1) || cvd
+  defp cvd_error_message("null"), do: nil
 
-      case verify_cvd(cvd) do
-        {:error, message} -> message
-        _ -> nil
-      end
+  defp cvd_error_message(cvd) do
+    # this is typically a two character string "1M" where the second char is the code we need to check.
+    cvd = String.at(cvd, 1) || cvd
+
+    case verify_cvd(cvd) do
+      {:error, message} -> message
+      _ -> nil
     end
   end
 
+  defp avs_error_message("null"), do: nil
+
   defp avs_error_message(avs) do
-    if avs == "null" do
-      nil
-    else
-      case verify_zipcode(avs) do
-        {:error, message} -> message
-        _ -> nil
-      end
+    case verify_zipcode(avs) do
+      {:error, message} -> message
+      _ -> nil
     end
   end
 
@@ -264,7 +261,6 @@ defmodule Moneris.Transaction do
     end
   end
 
-  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   def verify_address(avs) do
     case avs do
       "A" -> {:ok, "Match"}
@@ -286,7 +282,6 @@ defmodule Moneris.Transaction do
     end
   end
 
-  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   def verify_zipcode(avs) do
     case avs do
       "M" -> {:ok, "Match"}
@@ -303,18 +298,21 @@ defmodule Moneris.Transaction do
   end
 
   def build_token_response({:ok, %{body: body}}) do
-    xml = body |> parse
+    xml = parse(body)
     success = xpath(xml, ~x"//response/receipt/ResSuccess/text()"s)
+
     if success == "true" do
       {:ok, parse_token_response(xml)}
     else
       {:error, parse_error_reponse(xml)}
     end
   end
+
   def build_token_response({:error, response}) do
-    xml = response.body |> parse
+    xml = parse(response.body)
     {:error, parse_error_reponse(xml)}
   end
+
   def build_token_response(_) do
     {:error, %Response{success: false, message: "Unable to tokenize credit card."}}
   end
@@ -324,20 +322,23 @@ defmodule Moneris.Transaction do
   end
 
   def build_generic_response({:ok, %{body: body}}) do
-    xml = body |> parse
+    xml = parse(body)
     #success = xpath(xml, ~x"//response/receipt/Success/text()"s)
     response_code = xpath(xml, ~x"//response/receipt/ResponseCode/text()"I) || 999
     success = response_code < 50
+
     if success do
       {:ok, parse_error_reponse(xml)} # ???
     else
       {:error, parse_error_reponse(xml)}
     end
   end
+
   def build_generic_response({:error, response}) do
-    xml = response.body |> parse
+    xml = parse(response.body)
     {:error, parse_error_reponse(xml)}
   end
+
   def build_generic_response(_) do
     {:error, %Response{success: false, message: "unable to complete request."}}
   end

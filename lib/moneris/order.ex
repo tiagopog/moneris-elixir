@@ -1,15 +1,15 @@
 defmodule Moneris.Order do
   @moduledoc """
-  Order.
+  Holds order information.
   """
 
   defstruct [
-    order_id: UUID.uuid4(:hex),           # unique order id string
-    amount:     0,           # amount of purchase in cents
-    crypt_type: 7,           # leave this as 7-SSL enabled merchant unless its a 5-Authenticated E-commerce Transaction (VBV)
-    cust_id: nil,            # optional, (up to 50 alpha). used for searching in portal. invoice number?
-    transaction_number: nil, # assigned by Moneris once the order is complete
-    reference_number:   nil  # assigned by Moneris once the order is complete
+    order_id: UUID.uuid4(:hex), # unique order id string
+    amount:     0,              # amount of purchase in cents
+    crypt_type: 7,              # leave this as 7-SSL enabled merchant unless its a 5-Authenticated E-commerce Transaction (VBV)
+    cust_id: nil,               # optional, (up to 50 alpha). used for searching in portal. invoice number?
+    transaction_number: nil,    # assigned by Moneris once the order is complete
+    reference_number:   nil     # assigned by Moneris once the order is complete
   ]
 
   @type t :: %Moneris.Order{
