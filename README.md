@@ -17,7 +17,10 @@ end
 ### Example of Pre-Authorization + Completion with CVD
 
 ```elixir
-# Set up the gateway infomation:
+##
+# 1. Set up the gateway infomation:
+##
+
 iex> gateway = Moneris.Gateway.new(:development, "{{username}}", "{{api_key}}")
 %Moneris.Gateway{
   url: "https://esqa.moneris.com/gateway2/servlet/MpgRequest",
@@ -25,7 +28,10 @@ iex> gateway = Moneris.Gateway.new(:development, "{{username}}", "{{api_key}}")
   api_token: "{{api_key}}"
 }
 
-# Pre-authorize the payment:
+##
+# 2. Pre-authorize the payment:
+##
+
 iex> Moneris.preauth(gateway, order, card)
 {:ok,
  %Moneris.Response{
@@ -43,7 +49,10 @@ iex> Moneris.preauth(gateway, order, card)
    success: true
  }}
 
-# Update the order with some data from pre-authorization step:
+##
+# 3. Update the order with some data from pre-authorization step:
+##
+
 iex> order = %Moneris.Order{order | transaction_number: "10-0_482", reference_number: "660188080010010130"}
 %Moneris.Order{
   order_id: "e7e4a53245084998b5f7fa8155ffde10",
@@ -54,7 +63,10 @@ iex> order = %Moneris.Order{order | transaction_number: "10-0_482", reference_nu
   reference_number: "660188080010010130"
 }
 
-# Capture the payment:
+##
+# 4. Capture the payment:
+##
+
 iex> Moneris.capture(gateway, order)
 {:ok,
  %Moneris.Response{
